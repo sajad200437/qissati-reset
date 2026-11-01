@@ -1,163 +1,142 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>استعادة كلمة المرور - قصتي</title>
-
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
-  <style>
-    * { box-sizing: border-box; }
-
-    body {
-      margin: 0;
-      min-height: 100vh;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      background: #101b35;
-      color: white;
-      font-family: Arial, sans-serif;
-      padding: 20px;
-    }
-
-    .card {
-      width: 100%;
-      max-width: 380px;
-      padding: 30px;
-      border-radius: 18px;
-      background: #1b2947;
-      text-align: center;
-    }
-
-    h2 { color: #e5bd65; }
-
-    input, button {
-      display: block;
-      width: 100%;
-      padding: 14px;
-      margin-top: 16px;
-      border-radius: 9px;
-      font-size: 16px;
-    }
-
-    input {
-      border: 1px solid #52617c;
-      background: white;
-      color: #111;
-    }
-
-    button {
-      border: 0;
-      background: #d8ad50;
-      color: #101b35;
-      font-weight: bold;
-      cursor: pointer;
-    }
-
-    button:disabled {
-      opacity: 0.6;
-      cursor: wait;
-    }
-
-    #message {
-      margin-top: 18px;
-      line-height: 1.7;
-    }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>إدارة قصتي</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+*{box-sizing:border-box}
+body{
+  margin:0;min-height:100vh;display:flex;align-items:center;
+  justify-content:center;background:#101b35;color:white;
+  font-family:Arial,sans-serif;padding:20px
+}
+.card{
+  width:100%;max-width:390px;padding:28px;border-radius:18px;
+  background:#1b2947;text-align:center
+}
+h2{color:#e5bd65}
+input,button{
+  width:100%;padding:14px;margin-top:15px;
+  border-radius:9px;font-size:16px
+}
+input{border:1px solid #52617c;background:white;color:#111}
+button{
+  border:0;background:#d8ad50;color:#101b35;
+  font-weight:bold;cursor:pointer
+}
+.secondary{background:#344563;color:white}
+#message{line-height:1.7;margin-top:18px}
+.hidden{display:none}
+</style>
 </head>
-
 <body>
-  <div class="card">
-    <h2>قصتي</h2>
-    <p>تعيين كلمة مرور جديدة</p>
+<div class="card">
+  <h2>قصتي</h2>
+  <p id="heading">تسجيل دخول المدير</p>
 
-    <input
-      id="password"
-      type="password"
-      placeholder="كلمة المرور الجديدة"
-      autocomplete="new-password"
-    >
+  <input id="email" type="email" placeholder="البريد الإلكتروني">
+  <input id="password" type="password" placeholder="كلمة المرور">
 
-    <input
-      id="confirm"
-      type="password"
-      placeholder="تأكيد كلمة المرور"
-      autocomplete="new-password"
-    >
+  <button id="mainButton">تسجيل الدخول</button>
+  <button class="secondary" id="switchButton">إنشاء حساب جديد</button>
+  <button class="secondary" id="resetButton">نسيت كلمة المرور؟</button>
 
-    <button id="save">حفظ كلمة المرور</button>
+  <p id="message"></p>
+</div>
 
-    <p id="message"></p>
-  </div>
-
-  <script>
-    const SUPABASE_URL =
-      "https://owwcuyvnzqfupdffdauq.supabase.co";
-
+<script>
+const SUPABASE_URL = "https://owwcuyvnzqfupdffdauq.supabase.co";
 const SUPABASE_KEY = "sb_publishable_TPH5_h5rZEqQITVDm3MpOQ_r0-fiVT9";
-    const client = supabase.createClient(
-      SUPABASE_URL,
-      SUPABASE_KEY
-    );
 
-    const button = document.getElementById("save");
-    const message = document.getElementById("message");
+const client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-    button.addEventListener("click", async () => {
-      const password =
-        document.getElementById("password").value;
+let mode = "login";
 
-      const confirm =
-        document.getElementById("confirm").value;
+const heading = document.getElementById("heading");
+const mainButton = document.getElementById("mainButton");
+const switchButton = document.getElementById("switchButton");
+const resetButton = document.getElementById("resetButton");
+const message = document.getElementById("message");
 
-      if (SUPABASE_KEY === "ضع_مفتاح_Publishable_هنا") {
-        message.textContent = "يجب إضافة مفتاح Supabase أولاً.";
-        return;
-      }
+function showMessage(text) {
+  message.textContent = text;
+}
 
+switchButton.onclick = () => {
+  mode = mode === "login" ? "signup" : "login";
+  heading.textContent = mode === "login" ? "تسجيل دخول المدير" : "إنشاء حساب جديد";
+  mainButton.textContent = mode === "login" ? "تسجيل الدخول" : "إنشاء الحساب";
+  switchButton.textContent = mode === "login" ? "إنشاء حساب جديد" : "العودة لتسجيل الدخول";
+  resetButton.classList.toggle("hidden", mode === "signup");
+  showMessage("");
+};
+
+mainButton.onclick = async () => {
+  const email = document.getElementById("email").value.trim();
+  const password = document.getElementById("password").value;
+
+  if (!email || !password) {
+    showMessage("أدخل البريد الإلكتروني وكلمة المرور.");
+    return;
+  }
+
+  mainButton.disabled = true;
+
+  try {
+    if (mode === "signup") {
       if (password.length < 8) {
-        message.textContent =
-          "كلمة المرور يجب أن تكون 8 أحرف على الأقل.";
-        return;
+        throw new Error("كلمة المرور يجب أن تكون 8 أحرف على الأقل.");
       }
 
-      if (password !== confirm) {
-        message.textContent = "كلمتا المرور غير متطابقتين.";
-        return;
+      const { error } = await client.auth.signUp({ email, password });
+      if (error) throw error;
+
+      showMessage("تم إنشاء الحساب. لا يمتلك صلاحية المدير حتى تتم الموافقة عليه.");
+    } else {
+      const { data, error } = await client.auth.signInWithPassword({
+        email, password
+      });
+
+      if (error) throw error;
+
+      const { data: profile, error: profileError } = await client
+        .from("profiles")
+        .select("role")
+        .eq("user_id", data.user.id)
+        .maybeSingle();
+
+      if (profileError) throw profileError;
+
+      if (profile?.role !== "admin") {
+        await client.auth.signOut();
+        throw new Error("هذا الحساب غير معتمد كمدير.");
       }
 
-      button.disabled = true;
-      message.textContent = "جارٍ التحقق والحفظ...";
+      showMessage("تم تسجيل الدخول بنجاح. سنضيف لوحة الإدارة بالخطوة التالية.");
+    }
+  } catch (error) {
+    showMessage("تعذر إكمال العملية: " + error.message);
+  } finally {
+    mainButton.disabled = false;
+  }
+};
 
-      try {
-        const { data: sessionData } =
-          await client.auth.getSession();
+resetButton.onclick = async () => {
+  const email = document.getElementById("email").value.trim();
 
-        if (!sessionData.session) {
-          throw new Error(
-            "رابط الاستعادة غير صالح أو انتهت صلاحيته. اطلب رابطاً جديداً."
-          );
-        }
+  if (!email) {
+    showMessage("أدخل بريدك الإلكتروني أولاً.");
+    return;
+  }
 
-        const { error } =
-          await client.auth.updateUser({ password });
+  const { error } = await client.auth.resetPasswordForEmail(email, {
+    redirectTo: "https://sajad200437.github.io/qissati-reset/"
+  });
 
-        if (error) throw error;
-
-        message.textContent =
-          "تم تغيير كلمة المرور بنجاح.";
-
-        document.getElementById("password").value = "";
-        document.getElementById("confirm").value = "";
-
-      } catch (error) {
-        message.textContent = "تعذر تغيير كلمة المرور: " + error.message;
-      } finally {
-        button.disabled = false;
-      }
-    });
-  </script>
+  showMessage(error ? error.message : "تم إرسال رابط الاستعادة إلى بريدك.");
+};
+</script>
 </body>
 </html>
