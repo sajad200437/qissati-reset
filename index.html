@@ -5,45 +5,117 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>إدارة قصتي</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
 <style>
 *{box-sizing:border-box}
 body{
-  margin:0;min-height:100vh;display:flex;align-items:center;
-  justify-content:center;background:#101b35;color:white;
+  margin:0;background:#101b35;color:white;
   font-family:Arial,sans-serif;padding:20px
 }
+.container{max-width:950px;margin:auto}
 .card{
-  width:100%;max-width:390px;padding:28px;border-radius:18px;
-  background:#1b2947;text-align:center
+  background:#1b2947;padding:22px;border-radius:15px;
+  margin-bottom:20px
 }
-h2{color:#e5bd65}
-input,button{
-  width:100%;padding:14px;margin-top:15px;
-  border-radius:9px;font-size:16px
+h1,h2{color:#e5bd65}
+input,textarea,button,select{
+  width:100%;padding:12px;margin:7px 0;
+  border-radius:8px;font-size:15px
 }
-input{border:1px solid #52617c;background:white;color:#111}
+input,textarea{
+  border:1px solid #52617c;background:white;color:#111
+}
 button{
   border:0;background:#d8ad50;color:#101b35;
   font-weight:bold;cursor:pointer
 }
 .secondary{background:#344563;color:white}
-#message{line-height:1.7;margin-top:18px}
-.hidden{display:none}
+.danger{background:#a93636;color:white}
+.item{
+  background:#263653;padding:15px;border-radius:10px;
+  margin:12px 0
+}
+.item img{
+  width:100px;height:120px;object-fit:cover;
+  border-radius:8px
+}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.row button{flex:1;min-width:100px}
+.hidden{display:none!important}
+#message{line-height:1.8;color:#f3d88f}
+small{color:#c5cddd}
 </style>
 </head>
+
 <body>
-<div class="card">
-  <h2>قصتي</h2>
-  <p id="heading">تسجيل دخول المدير</p>
+<div class="container">
+
+<!-- LOGIN -->
+<div id="loginBox" class="card">
+  <h1>قصتي</h1>
+  <h3>تسجيل دخول المدير</h3>
 
   <input id="email" type="email" placeholder="البريد الإلكتروني">
   <input id="password" type="password" placeholder="كلمة المرور">
 
-  <button id="mainButton">تسجيل الدخول</button>
-  <button class="secondary" id="switchButton">إنشاء حساب جديد</button>
+  <button id="loginButton">تسجيل الدخول</button>
+  <button class="secondary" id="signupButton">إنشاء حساب جديد</button>
   <button class="secondary" id="resetButton">نسيت كلمة المرور؟</button>
 
   <p id="message"></p>
+</div>
+
+<!-- DASHBOARD -->
+<div id="dashboard" class="hidden">
+
+  <div class="card">
+    <div class="row">
+      <h1>لوحة إدارة قصتي</h1>
+      <button id="logoutButton">تسجيل الخروج</button>
+    </div>
+    <p>إدارة المسلسلات والحلقات</p>
+  </div>
+
+  <!-- ADD SERIES -->
+  <div class="card">
+    <h2 id="seriesFormTitle">إضافة مسلسل جديد</h2>
+
+    <input id="seriesTitle" placeholder="اسم المسلسل">
+    <textarea id="seriesDescription" placeholder="وصف المسلسل"></textarea>
+
+    <label>صورة الغلاف</label>
+    <input id="seriesPoster" type="file" accept="image/*">
+
+    <button id="saveSeriesButton">حفظ المسلسل</button>
+    <button class="secondary hidden" id="cancelSeriesEdit">إلغاء التعديل</button>
+  </div>
+
+  <!-- SERIES LIST -->
+  <div class="card">
+    <h2>المسلسلات</h2>
+    <button class="secondary" id="refreshButton">تحديث القائمة</button>
+    <div id="seriesList"></div>
+  </div>
+
+  <!-- EPISODES -->
+  <div id="episodeSection" class="card hidden">
+    <h2 id="episodeHeading">إضافة حلقة</h2>
+
+    <input id="episodeTitle" placeholder="عنوان الحلقة">
+    <input id="episodeNumber" type="number" min="1" placeholder="رقم الحلقة">
+
+    <label>فيديو الحلقة</label>
+    <input id="episodeVideo" type="file" accept="video/*">
+    <small>الحد الأقصى لحجم الملف 50MB.</small>
+
+    <button id="saveEpisodeButton">حفظ الحلقة</button>
+    <button class="secondary hidden" id="cancelEpisodeEdit">إلغاء التعديل</button>
+
+    <h2>حلقات المسلسل</h2>
+    <div id="episodeList"></div>
+  </div>
+
+</div>
 </div>
 
 <script>
@@ -51,92 +123,424 @@ const SUPABASE_URL = "https://owwcuyvnzqfupdffdauq.supabase.co";
 const SUPABASE_KEY = "sb_publishable_TPH5_h5rZEqQITVDm3MpOQ_r0-fiVT9";
 
 const client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const BUCKET = "qissati-media";
 
-let mode = "login";
+let currentUser = null;
+let editingSeriesId = null;
+let selectedSeriesId = null;
+let editingEpisodeId = null;
 
-const heading = document.getElementById("heading");
-const mainButton = document.getElementById("mainButton");
-const switchButton = document.getElementById("switchButton");
-const resetButton = document.getElementById("resetButton");
-const message = document.getElementById("message");
+const $ = id => document.getElementById(id);
 
-function showMessage(text) {
-  message.textContent = text;
+function message(text){
+  $("message").textContent = text;
 }
 
-switchButton.onclick = () => {
-  mode = mode === "login" ? "signup" : "login";
-  heading.textContent = mode === "login" ? "تسجيل دخول المدير" : "إنشاء حساب جديد";
-  mainButton.textContent = mode === "login" ? "تسجيل الدخول" : "إنشاء الحساب";
-  switchButton.textContent = mode === "login" ? "إنشاء حساب جديد" : "العودة لتسجيل الدخول";
-  resetButton.classList.toggle("hidden", mode === "signup");
-  showMessage("");
-};
+function safeText(value){
+  return String(value ?? "").replace(/[&<>"']/g, c => ({
+    "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
+  })[c]);
+}
 
-mainButton.onclick = async () => {
-  const email = document.getElementById("email").value.trim();
-  const password = document.getElementById("password").value;
+async function checkAdmin(){
+  const {data:{session}} = await client.auth.getSession();
 
-  if (!email || !password) {
-    showMessage("أدخل البريد الإلكتروني وكلمة المرور.");
+  if(!session){
+    showLogin();
+    return false;
+  }
+
+  const {data:profile,error} = await client
+    .from("profiles")
+    .select("role")
+    .eq("user_id",session.user.id)
+    .maybeSingle();
+
+  if(error || profile?.role !== "admin"){
+    await client.auth.signOut();
+    showLogin();
+    message("هذا الحساب غير معتمد كمدير.");
+    return false;
+  }
+
+  currentUser = session.user;
+  $("loginBox").classList.add("hidden");
+  $("dashboard").classList.remove("hidden");
+
+  await loadSeries();
+  return true;
+}
+
+function showLogin(){
+  $("dashboard").classList.add("hidden");
+  $("loginBox").classList.remove("hidden");
+}
+
+$("loginButton").onclick = async () => {
+  const email = $("email").value.trim();
+  const password = $("password").value;
+
+  if(!email || !password){
+    message("أدخل البريد وكلمة المرور.");
     return;
   }
 
-  mainButton.disabled = true;
+  $("loginButton").disabled = true;
 
-  try {
-    if (mode === "signup") {
-      if (password.length < 8) {
-        throw new Error("كلمة المرور يجب أن تكون 8 أحرف على الأقل.");
-      }
-
-      const { error } = await client.auth.signUp({ email, password });
-      if (error) throw error;
-
-      showMessage("تم إنشاء الحساب. لا يمتلك صلاحية المدير حتى تتم الموافقة عليه.");
-    } else {
-      const { data, error } = await client.auth.signInWithPassword({
-        email, password
-      });
-
-      if (error) throw error;
-
-      const { data: profile, error: profileError } = await client
-        .from("profiles")
-        .select("role")
-        .eq("user_id", data.user.id)
-        .maybeSingle();
-
-      if (profileError) throw profileError;
-
-      if (profile?.role !== "admin") {
-        await client.auth.signOut();
-        throw new Error("هذا الحساب غير معتمد كمدير.");
-      }
-
-      showMessage("تم تسجيل الدخول بنجاح. سنضيف لوحة الإدارة بالخطوة التالية.");
-    }
-  } catch (error) {
-    showMessage("تعذر إكمال العملية: " + error.message);
-  } finally {
-    mainButton.disabled = false;
-  }
-};
-
-resetButton.onclick = async () => {
-  const email = document.getElementById("email").value.trim();
-
-  if (!email) {
-    showMessage("أدخل بريدك الإلكتروني أولاً.");
-    return;
-  }
-
-  const { error } = await client.auth.resetPasswordForEmail(email, {
-    redirectTo: "https://sajad200437.github.io/qissati-reset/"
+  const {error} = await client.auth.signInWithPassword({
+    email,password
   });
 
-  showMessage(error ? error.message : "تم إرسال رابط الاستعادة إلى بريدك.");
+  if(error){
+    message(error.message);
+  }else{
+    await checkAdmin();
+  }
+
+  $("loginButton").disabled = false;
 };
+
+$("signupButton").onclick = async () => {
+  const email = $("email").value.trim();
+  const password = $("password").value;
+
+  if(!email || password.length < 8){
+    message("أدخل البريد وكلمة مرور من 8 أحرف على الأقل.");
+    return;
+  }
+
+  const {error} = await client.auth.signUp({email,password});
+
+  message(error ? error.message :
+    "تم إنشاء الحساب. يحتاج موافقة المدير قبل استخدام لوحة الإدارة.");
+};
+
+$("resetButton").onclick = async () => {
+  const email = $("email").value.trim();
+
+  if(!email){
+    message("أدخل بريدك الإلكتروني أولاً.");
+    return;
+  }
+
+  const {error} = await client.auth.resetPasswordForEmail(email,{
+    redirectTo:"https://sajad200437.github.io/qissati-reset/"
+  });
+
+  message(error ? error.message : "تم إرسال رابط الاستعادة إلى بريدك.");
+};
+
+$("logoutButton").onclick = async () => {
+  await client.auth.signOut();
+  currentUser = null;
+  showLogin();
+};
+
+async function uploadFile(file,folder){
+  if(!file) return null;
+
+  if(file.size > 50 * 1024 * 1024){
+    throw new Error("حجم الملف أكبر من 50MB.");
+  }
+
+  const extension = file.name.split(".").pop().toLowerCase();
+  const path = `${folder}/${Date.now()}-${crypto.randomUUID()}.${extension}`;
+
+  const {error} = await client.storage
+    .from(BUCKET)
+    .upload(path,file,{upsert:false});
+
+  if(error) throw error;
+
+  const {data} = client.storage.from(BUCKET).getPublicUrl(path);
+  return data.publicUrl;
+}
+
+// SERIES
+
+async function loadSeries(){
+  const {data,error} = await client
+    .from("series")
+    .select("*")
+    .order("created_at",{ascending:false});
+
+  if(error){
+    alert("تعذر تحميل المسلسلات: " + error.message);
+    return;
+  }
+
+  $("seriesList").innerHTML = "";
+
+  for(const s of data){
+    const div = document.createElement("div");
+    div.className = "item";
+
+    div.innerHTML = `
+      <div class="row">
+        ${s.poster_url ? `<img src="${safeText(s.poster_url)}">` : ""}
+        <div>
+          <h3>${safeText(s.title)}</h3>
+          <p>${safeText(s.description || "")}</p>
+          <small>${s.is_published ? "منشور" : "غير منشور"}</small>
+        </div>
+      </div>
+      <div class="row">
+        <button data-action="episodes">الحلقات</button>
+        <button class="secondary" data-action="edit">تعديل</button>
+        <button class="secondary" data-action="publish">${s.is_published ? "إخفاء" : "نشر"}</button>
+        <button class="danger" data-action="delete">حذف</button>
+      </div>
+    `;
+
+    div.querySelector('[data-action="episodes"]').onclick = () => {
+      openEpisodes(s.id,s.title);
+    };
+
+    div.querySelector('[data-action="edit"]').onclick = () => {
+      editSeries(s);
+    };
+
+    div.querySelector('[data-action="publish"]').onclick = async () => {
+      const {error} = await client.from("series")
+        .update({is_published:!s.is_published})
+        .eq("id",s.id);
+
+      if(error) alert(error.message);
+      else await loadSeries();
+    };
+
+    div.querySelector('[data-action="delete"]').onclick = async () => {
+      if(!confirm("هل تريد حذف المسلسل وحلقاته؟")) return;
+
+      const {error:episodeError} = await client
+        .from("episodes").delete().eq("series_id",s.id);
+
+      if(episodeError){
+        alert(episodeError.message);
+        return;
+      }
+
+      const {error} = await client.from("series").delete().eq("id",s.id);
+
+      if(error) alert(error.message);
+      else{
+        $("episodeSection").classList.add("hidden");
+        await loadSeries();
+      }
+    };
+
+    $("seriesList").appendChild(div);
+  }
+}
+
+async function saveSeries(){
+  try{
+    const title = $("seriesTitle").value.trim();
+    const description = $("seriesDescription").value.trim();
+    const file = $("seriesPoster").files[0];
+
+    if(!title) throw new Error("اكتب اسم المسلسل.");
+
+    let poster_url = null;
+
+    if(file){
+      poster_url = await uploadFile(file,"posters");
+    }
+
+    let result;
+
+    if(editingSeriesId){
+      const values = {title,description};
+      if(poster_url) values.poster_url = poster_url;
+
+      result = await client.from("series")
+        .update(values).eq("id",editingSeriesId);
+    }else{
+      result = await client.from("series").insert({
+        title,description,poster_url,is_published:false
+      });
+    }
+
+    if(result.error) throw result.error;
+
+    resetSeriesForm();
+    await loadSeries();
+    alert("تم حفظ المسلسل بنجاح.");
+
+  }catch(error){
+    alert("تعذر الحفظ: " + error.message);
+  }
+}
+
+function editSeries(s){
+  editingSeriesId = s.id;
+  $("seriesTitle").value = s.title;
+  $("seriesDescription").value = s.description || "";
+  $("seriesFormTitle").textContent = "تعديل المسلسل";
+  $("saveSeriesButton").textContent = "حفظ التعديلات";
+  $("cancelSeriesEdit").classList.remove("hidden");
+  window.scrollTo({top:0,behavior:"smooth"});
+}
+
+function resetSeriesForm(){
+  editingSeriesId = null;
+  $("seriesTitle").value = "";
+  $("seriesDescription").value = "";
+  $("seriesPoster").value = "";
+  $("seriesFormTitle").textContent = "إضافة مسلسل جديد";
+  $("saveSeriesButton").textContent = "حفظ المسلسل";
+  $("cancelSeriesEdit").classList.add("hidden");
+}
+
+$("saveSeriesButton").onclick = saveSeries;
+$("cancelSeriesEdit").onclick = resetSeriesForm;
+$("refreshButton").onclick = loadSeries;
+
+// EPISODES
+
+async function openEpisodes(id,title){
+  selectedSeriesId = id;
+  editingEpisodeId = null;
+
+  $("episodeHeading").textContent = "حلقات: " + title;
+  $("episodeSection").classList.remove("hidden");
+  resetEpisodeForm();
+  await loadEpisodes();
+
+  $("episodeSection").scrollIntoView({behavior:"smooth"});
+}
+
+async function loadEpisodes(){
+  const {data,error} = await client
+    .from("episodes")
+    .select("*")
+    .eq("series_id",selectedSeriesId)
+    .order("episode_number");
+
+  if(error){
+    alert(error.message);
+    return;
+  }
+
+  $("episodeList").innerHTML = "";
+
+  for(const ep of data){
+    const div = document.createElement("div");
+    div.className = "item";
+
+    div.innerHTML = `
+      <h3>الحلقة ${safeText(ep.episode_number)}: ${safeText(ep.title)}</h3>
+      <small>${ep.is_published ? "منشورة" : "غير منشورة"}</small>
+      <div class="row">
+        <button class="secondary" data-action="edit">تعديل</button>
+        <button class="secondary" data-action="publish">${ep.is_published ? "إخفاء" : "نشر"}</button>
+        <button class="danger" data-action="delete">حذف</button>
+      </div>
+    `;
+
+    div.querySelector('[data-action="edit"]').onclick = () => {
+      editEpisode(ep);
+    };
+
+    div.querySelector('[data-action="publish"]').onclick = async () => {
+      const {error} = await client.from("episodes")
+        .update({is_published:!ep.is_published})
+        .eq("id",ep.id);
+
+      if(error) alert(error.message);
+      else await loadEpisodes();
+    };
+
+    div.querySelector('[data-action="delete"]').onclick = async () => {
+      if(!confirm("هل تريد حذف هذه الحلقة؟")) return;
+
+      const {error} = await client.from("episodes")
+        .delete().eq("id",ep.id);
+
+      if(error) alert(error.message);
+      else await loadEpisodes();
+    };
+
+    $("episodeList").appendChild(div);
+  }
+}
+
+async function saveEpisode(){
+  try{
+    const title = $("episodeTitle").value.trim();
+    const episode_number = Number($("episodeNumber").value);
+    const file = $("episodeVideo").files[0];
+
+    if(!title || !episode_number || episode_number < 1){
+      throw new Error("أدخل عنوان الحلقة ورقمها بشكل صحيح.");
+    }
+
+    let video_url = null;
+
+    if(file){
+      video_url = await uploadFile(file,"videos");
+    }
+
+    let result;
+
+    if(editingEpisodeId){
+      const values = {title,episode_number};
+      if(video_url) values.video_url = video_url;
+
+      result = await client.from("episodes")
+        .update(values).eq("id",editingEpisodeId);
+    }else{
+      if(!video_url) throw new Error("اختر فيديو الحلقة.");
+
+      result = await client.from("episodes").insert({
+        series_id:selectedSeriesId,
+        title,
+        episode_number,
+        video_url,
+        is_published:false
+      });
+    }
+
+    if(result.error) throw result.error;
+
+    resetEpisodeForm();
+    await loadEpisodes();
+    alert("تم حفظ الحلقة بنجاح.");
+
+  }catch(error){
+    alert("تعذر حفظ الحلقة: " + error.message);
+  }
+}
+
+function editEpisode(ep){
+  editingEpisodeId = ep.id;
+  $("episodeTitle").value = ep.title;
+  $("episodeNumber").value = ep.episode_number;
+  $("episodeHeading").textContent = "تعديل الحلقة";
+  $("saveEpisodeButton").textContent = "حفظ التعديلات";
+  $("cancelEpisodeEdit").classList.remove("hidden");
+}
+
+function resetEpisodeForm(){
+  editingEpisodeId = null;
+  $("episodeTitle").value = "";
+  $("episodeNumber").value = "";
+  $("episodeVideo").value = "";
+  $("episodeHeading").textContent = "إضافة حلقة";
+  $("saveEpisodeButton").textContent = "حفظ الحلقة";
+  $("cancelEpisodeEdit").classList.add("hidden");
+}
+
+$("saveEpisodeButton").onclick = saveEpisode;
+$("cancelEpisodeEdit").onclick = resetEpisodeForm;
+
+client.auth.onAuthStateChange((event,session) => {
+  if(event === "SIGNED_OUT"){
+    showLogin();
+  }
+});
+
+checkAdmin();
 </script>
 </body>
 </html>
