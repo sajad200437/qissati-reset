@@ -4,87 +4,160 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>استعادة كلمة المرور - قصتي</title>
+
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
   <style>
+    * { box-sizing: border-box; }
+
     body {
       margin: 0;
       min-height: 100vh;
-      display: grid;
-      place-items: center;
+      display: flex;
+      justify-content: center;
+      align-items: center;
       background: #101b35;
       color: white;
       font-family: Arial, sans-serif;
+      padding: 20px;
     }
+
     .card {
-      width: min(85%, 360px);
-      padding: 28px;
+      width: 100%;
+      max-width: 380px;
+      padding: 30px;
       border-radius: 18px;
       background: #1b2947;
       text-align: center;
     }
+
     h2 { color: #e5bd65; }
+
     input, button {
-      box-sizing: border-box;
+      display: block;
       width: 100%;
-      padding: 13px;
-      margin-top: 14px;
+      padding: 14px;
+      margin-top: 16px;
       border-radius: 9px;
-      border: 0;
       font-size: 16px;
     }
+
+    input {
+      border: 1px solid #52617c;
+      background: white;
+      color: #111;
+    }
+
     button {
+      border: 0;
       background: #d8ad50;
       color: #101b35;
       font-weight: bold;
       cursor: pointer;
     }
-    #message { margin-top: 16px; }
+
+    button:disabled {
+      opacity: 0.6;
+      cursor: wait;
+    }
+
+    #message {
+      margin-top: 18px;
+      line-height: 1.7;
+    }
   </style>
 </head>
+
 <body>
   <div class="card">
     <h2>قصتي</h2>
     <p>تعيين كلمة مرور جديدة</p>
-    <input id="password" type="password" placeholder="كلمة المرور الجديدة">
-    <input id="confirm" type="password" placeholder="تأكيد كلمة المرور">
+
+    <input
+      id="password"
+      type="password"
+      placeholder="كلمة المرور الجديدة"
+      autocomplete="new-password"
+    >
+
+    <input
+      id="confirm"
+      type="password"
+      placeholder="تأكيد كلمة المرور"
+      autocomplete="new-password"
+    >
+
     <button id="save">حفظ كلمة المرور</button>
+
     <p id="message"></p>
   </div>
 
   <script>
-    const SUPABASE_URL = "https://owwcuyvnzqfupdffdauq.supabase.co";
-    const SUPABASE_KEY = sb_publishable_TPH5_h5rZEqQITVDm3MpOQ_r0-fiVT9
+    const SUPABASE_URL =
+      "https://owwcuyvnzqfupdffdauq.supabase.co";
 
+const SUPABASE_KEY = "sb_publishable_TPH5_h5rZEqQITVDm3MpOQ_r0-fiVT9";
     const client = supabase.createClient(
       SUPABASE_URL,
       SUPABASE_KEY
     );
 
-    document.getElementById("save").onclick = async () => {
-      const password = document.getElementById("password").value;
-      const confirm = document.getElementById("confirm").value;
-      const message = document.getElementById("message");
+    const button = document.getElementById("save");
+    const message = document.getElementById("message");
+
+    button.addEventListener("click", async () => {
+      const password =
+        document.getElementById("password").value;
+
+      const confirm =
+        document.getElementById("confirm").value;
+
+      if (SUPABASE_KEY === "ضع_مفتاح_Publishable_هنا") {
+        message.textContent = "يجب إضافة مفتاح Supabase أولاً.";
+        return;
+      }
 
       if (password.length < 8) {
-        message.textContent = "كلمة المرور يجب أن تكون 8 أحرف على الأقل";
+        message.textContent =
+          "كلمة المرور يجب أن تكون 8 أحرف على الأقل.";
         return;
       }
 
       if (password !== confirm) {
-        message.textContent = "كلمتا المرور غير متطابقتين";
+        message.textContent = "كلمتا المرور غير متطابقتين.";
         return;
       }
 
-      message.textContent = "جارٍ الحفظ...";
+      button.disabled = true;
+      message.textContent = "جارٍ التحقق والحفظ...";
 
-      const { error } = await client.auth.updateUser({ password });
+      try {
+        const { data: sessionData } =
+          await client.auth.getSession();
 
-      if (error) {
+        if (!sessionData.session) {
+          throw new Error(
+            "رابط الاستعادة غير صالح أو انتهت صلاحيته. اطلب رابطاً جديداً."
+          );
+        }
+
+        const { error } =
+          await client.auth.updateUser({ password });
+
+        if (error) throw error;
+
+        message.textContent =
+          "تم تغيير كلمة المرور بنجاح.";
+
+        document.getElementById("password").value = "";
+        document.getElementById("confirm").value = "";
+
+      } catch (error) {
         message.textContent = "تعذر تغيير كلمة المرور: " + error.message;
-      } else {
-        message.textContent = "تم تغيير كلمة المرور بنجاح";
+      } finally {
+        button.disabled = false;
       }
-    };
+    });
   </script>
 </body>
 </html>
